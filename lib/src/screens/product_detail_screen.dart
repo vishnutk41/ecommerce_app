@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'product_update_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -25,10 +24,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _fetchProduct() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final res = await http.get(Uri.parse('https://dummyjson.com/products/${widget.productId}'));
+      final dio = Dio();
+      final res = await dio.get('https://dummyjson.com/products/${widget.productId}');
       if (res.statusCode == 200) {
         setState(() {
-          _product = jsonDecode(res.body);
+          _product = res.data;
           _loading = false;
         });
       } else {
@@ -59,12 +59,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
     if (confirm != true) return;
     setState(() { _loading = true; });
-    final res = await http.delete(Uri.parse('https://dummyjson.com/products/${widget.productId}'));
-    if (res.statusCode == 200) {
-      Navigator.pop(context, true); // Return to previous screen
-    } else {
+    try {
+      final dio = Dio();
+      final res = await dio.delete('https://dummyjson.com/products/${widget.productId}');
+      if (res.statusCode == 200) {
+        Navigator.pop(context, true); // Return to previous screen
+      } else {
+        setState(() { _loading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete product')));
+      }
+    } catch (e) {
       setState(() { _loading = false; });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete product')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -219,4 +225,4 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
     );
   }
-} 
+}

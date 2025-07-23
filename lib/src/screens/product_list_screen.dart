@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'product_detail_screen.dart';
 import 'product_create_screen.dart';
@@ -47,9 +47,10 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
 
   Future<void> _fetchCategories() async {
     try {
-      final res = await http.get(Uri.parse('https://dummyjson.com/products/categories'));
+      final dio = Dio();
+      final res = await dio.get('https://dummyjson.com/products/categories');
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+        final data = res.data;
         setState(() {
           _categories = List<String>.from(data);
         });
@@ -66,9 +67,10 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
       } else if (_selectedCategory != null) {
         url = 'https://dummyjson.com/products/category/$_selectedCategory';
       }
-      final res = await http.get(Uri.parse(url));
+      final dio = Dio();
+      final res = await dio.get(url);
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+        final data = res.data;
         List<dynamic> products = data['products'] ?? [];
         // Sorting
         if (_sort == 'A-Z') {
@@ -311,4 +313,4 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
       ),
     );
   }
-} 
+}

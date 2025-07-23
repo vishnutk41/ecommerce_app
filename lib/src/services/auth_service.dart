@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
 class AuthService extends ChangeNotifier {
   static const _storage = FlutterSecureStorage();
@@ -12,21 +12,26 @@ class AuthService extends ChangeNotifier {
   String? get token => _token;
 
   Future<bool> login(String username, String password) async {
-    final res = await http.post(
-      Uri.parse('https://dummyjson.com/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'password': password,
-      }),
-    );
-    if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
-      _token = data['token'] ?? data['accessToken'];
-      _user = data;
-      await _storage.write(key: 'token', value: _token);
-      notifyListeners();
-      return true;
+    try {
+      final dio = Dio();
+      final res = await dio.post(
+        'https://dummyjson.com/auth/login',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+        data: {
+          'username': username,
+          'password': password,
+        },
+      );
+      if (res.statusCode == 200) {
+        final data = res.data;
+        _token = data['token'] ?? data['accessToken'];
+        _user = data;
+        await _storage.write(key: 'token', value: _token);
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      // Handle error if needed
     }
     return false;
   }
@@ -43,18 +48,25 @@ class AuthService extends ChangeNotifier {
     if (storedToken == null) return false;
     _token = storedToken;
     // Fetch user profile
-    final res = await http.get(
-      Uri.parse('https://dummyjson.com/auth/me'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_token',
-      },
-    );
-    if (res.statusCode == 200) {
-      _user = jsonDecode(res.body);
-      notifyListeners();
-      return true;
+    try {
+      final dio = Dio();
+      final res = await dio.get(
+        'https://dummyjson.com/auth/me',
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_token',
+          },
+        ),
+      );
+      if (res.statusCode == 200) {
+        _user = res.data;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      // Handle error if needed
     }
     return false;
   }
-} 
+}

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'dart:convert';
 
 class ProductUpdateScreen extends StatefulWidget {
@@ -46,10 +46,11 @@ class _ProductUpdateScreenState extends State<ProductUpdateScreen> {
     setState(() { _loading = true; _error = null; _success = null; });
     _formKey.currentState!.save();
     try {
-      final res = await http.put(
-        Uri.parse('https://dummyjson.com/products/${widget.product['id']}'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final dio = Dio();
+      final res = await dio.put(
+        'https://dummyjson.com/products/${widget.product['id']}',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+        data: {
           'title': _title,
           'description': _description,
           'category': _category,
@@ -58,7 +59,7 @@ class _ProductUpdateScreenState extends State<ProductUpdateScreen> {
           'rating': _rating,
           'thumbnail': _thumbnail,
           'images': _images.split(',').map((e) => e.trim()).toList(),
-        }),
+        },
       );
       if (res.statusCode == 200) {
         setState(() { _success = 'Product updated successfully!'; });
@@ -150,4 +151,4 @@ class _ProductUpdateScreenState extends State<ProductUpdateScreen> {
       ),
     );
   }
-} 
+}

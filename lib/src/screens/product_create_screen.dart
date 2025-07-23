@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'dart:convert';
 
 class ProductCreateScreen extends StatefulWidget {
@@ -28,10 +28,11 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     setState(() { _loading = true; _error = null; _success = null; });
     _formKey.currentState!.save();
     try {
-      final res = await http.post(
-        Uri.parse('https://dummyjson.com/products/add'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final dio = Dio();
+      final res = await dio.post(
+        'https://dummyjson.com/products/add',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+        data: {
           'title': _title,
           'description': _description,
           'category': _category,
@@ -40,7 +41,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
           'rating': _rating,
           'thumbnail': _thumbnail,
           'images': _images.split(',').map((e) => e.trim()).toList(),
-        }),
+        },
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
         setState(() { _success = 'Product created successfully!'; });
@@ -124,4 +125,4 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
       ),
     );
   }
-} 
+}
