@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -32,8 +32,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkAuth() async {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final isLoggedIn = await authService.tryAutoLogin();
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    final isLoggedIn = await authViewModel.tryAutoLogin();
     if (isLoggedIn) {
       Navigator.pushReplacementNamed(context, '/main');
     } else {

@@ -7,6 +7,7 @@ import 'package:flutter/animation.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import '../../viewmodels/product_list_viewmodel.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({Key? key}) : super(key: key);
@@ -16,18 +17,14 @@ class ProductListScreen extends StatefulWidget {
 }
 
 class _ProductListScreenState extends State<ProductListScreen> with SingleTickerProviderStateMixin {
-  List<dynamic> _products = [];
-  bool _loading = true;
-  String? _error;
-  String _searchQuery = '';
-  String _sort = 'A-Z';
-  String? _selectedCategory;
-  List<String> _categories = [];
   late AnimationController _fabController;
 
   @override
   void initState() {
     super.initState();
+    final viewModel = Provider.of<ProductListViewModel>(context, listen: false);
+    viewModel.fetchCategories();
+    viewModel.fetchProducts();
     _fabController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 150),
@@ -35,8 +32,6 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
       upperBound: 1.0,
       value: 1.0,
     );
-    _fetchCategories();
-    _fetchProducts();
   }
 
   @override
@@ -45,62 +40,7 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
     super.dispose();
   }
 
-  Future<void> _fetchCategories() async {
-    try {
-      final dio = Dio();
-      final res = await dio.get('https://dummyjson.com/products/categories');
-      if (res.statusCode == 200) {
-        final data = res.data;
-        setState(() {
-          _categories = List<String>.from(data);
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _fetchProducts() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      String url = 'https://dummyjson.com/products';
-      if (_searchQuery.isNotEmpty) {
-        url = 'https://dummyjson.com/products/search?q=$_searchQuery';
-      } else if (_selectedCategory != null) {
-        url = 'https://dummyjson.com/products/category/$_selectedCategory';
-      }
-      final dio = Dio();
-      final res = await dio.get(url);
-      if (res.statusCode == 200) {
-        final data = res.data;
-        List<dynamic> products = data['products'] ?? [];
-        // Sorting
-        if (_sort == 'A-Z') {
-          products.sort((a, b) => (a['title'] ?? '').compareTo(b['title'] ?? ''));
-        } else if (_sort == 'Z-A') {
-          products.sort((a, b) => (b['title'] ?? '').compareTo(a['title'] ?? ''));
-        } else if (_sort == 'Price: Low to High') {
-          products.sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
-        } else if (_sort == 'Price: High to Low') {
-          products.sort((a, b) => (b['price'] as num).compareTo(a['price'] as num));
-        }
-        setState(() {
-          _products = products;
-          _loading = false;
-        });
-      } else {
-        setState(() {
-          _error = 'Failed to load products';
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Error: $e';
-        _loading = false;
-      });
-    }
-  }
-
-  Widget _buildFilters() {
+  Widget _buildFilters(BuildContext context, ProductListViewModel viewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -129,17 +69,14 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
               fillColor: Colors.white,
               contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
             ),
-            onChanged: (v) {
-              _searchQuery = v;
-              _fetchProducts();
-            },
+            onChanged: (v) => viewModel.setSearchQuery(v),
           ),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
             DropdownButton<String>(
-              value: _sort,
+              value: viewModel.sort,
               items: const [
                 DropdownMenuItem(value: 'A-Z', child: Text('A-Z')),
                 DropdownMenuItem(value: 'Z-A', child: Text('Z-A')),
@@ -147,10 +84,7 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
                 DropdownMenuItem(value: 'Price: High to Low', child: Text('Price: High to Low')),
               ],
               onChanged: (v) {
-                if (v != null) {
-                  setState(() { _sort = v; });
-                  _fetchProducts();
-                }
+                if (v != null) viewModel.setSort(v);
               },
             ),
             const SizedBox(width: 16),
@@ -161,21 +95,15 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
                   children: [
                     ChoiceChip(
                       label: const Text('All'),
-                      selected: _selectedCategory == null,
-                      onSelected: (_) {
-                        setState(() { _selectedCategory = null; });
-                        _fetchProducts();
-                      },
+                      selected: viewModel.selectedCategory == null,
+                      onSelected: (_) => viewModel.setCategory(null),
                     ),
-                    ..._categories.map((cat) => Padding(
+                    ...viewModel.categories.map((cat) => Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4.0),
                       child: ChoiceChip(
                         label: Text(cat),
-                        selected: _selectedCategory == cat,
-                        onSelected: (_) {
-                          setState(() { _selectedCategory = cat; });
-                          _fetchProducts();
-                        },
+                        selected: viewModel.selectedCategory == cat,
+                        onSelected: (_) => viewModel.setCategory(cat),
                       ),
                     )),
                   ],
@@ -190,124 +118,125 @@ class _ProductListScreenState extends State<ProductListScreen> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Products'),
-        // actions removed for bottom navigation bar
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            _buildFilters(),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(child: Text(_error!))
-                      : MasonryGridView.builder(
-                          gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                          ),
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          itemCount: _products.length,
-                          itemBuilder: (context, index) {
-                            final product = _products[index];
-                            return TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0, end: 1),
-                              duration: Duration(milliseconds: 300 + index * 50),
-                              builder: (context, value, child) => Opacity(
-                                opacity: value,
-                                child: Transform.translate(
-                                  offset: Offset(0, 20 * (1 - value)),
-                                  child: child,
-                                ),
-                              ),
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ProductDetailScreen(productId: product['id']),
-                                    ),
-                                  );
-                                },
-                                child: Card(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  elevation: 3,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        if (product['thumbnail'] != null)
-                                          Hero(
-                                            tag: 'product-image-${product['id']}',
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(12),
-                                              child: Image.network(
-                                                product['thumbnail'],
-                                                height: 120 + (index % 3) * 20.0,
-                                                width: double.infinity,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          )
-                                        else
-                                          Container(
-                                            height: 120,
-                                            color: Colors.grey[200],
-                                            child: const Icon(Icons.image, size: 40),
-                                          ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          product['title'] ?? '',
-                                          style: Theme.of(context).textTheme.titleMedium,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Price: \$${product['price']}',
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.green[700]),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-            ),
-          ],
+    return Consumer<ProductListViewModel>(
+      builder: (context, viewModel, _) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Products'),
         ),
-      ),
-      floatingActionButton: ScaleTransition(
-        scale: _fabController,
-        child: GestureDetector(
-          onTapDown: (_) => _fabController.reverse(),
-          onTapUp: (_) => _fabController.forward(),
-          onTapCancel: () => _fabController.forward(),
-          onTap: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ProductCreateScreen(),
+        body: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            children: [
+              _buildFilters(context, viewModel),
+              const SizedBox(height: 8),
+              Expanded(
+                child: viewModel.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : viewModel.error != null
+                        ? Center(child: Text(viewModel.error!))
+                        : MasonryGridView.builder(
+                            gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                            ),
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            itemCount: viewModel.products.length,
+                            itemBuilder: (context, index) {
+                              final product = viewModel.products[index];
+                              return TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: 1),
+                                duration: Duration(milliseconds: 300 + index * 50),
+                                builder: (context, value, child) => Opacity(
+                                  opacity: value,
+                                  child: Transform.translate(
+                                    offset: Offset(0, 20 * (1 - value)),
+                                    child: child,
+                                  ),
+                                ),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ProductDetailScreen(productId: product.id),
+                                      ),
+                                    );
+                                  },
+                                  child: Card(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    elevation: 3,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (product.thumbnail.isNotEmpty)
+                                            Hero(
+                                              tag: 'product-image-${product.id}',
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: Image.network(
+                                                  product.thumbnail,
+                                                  height: 120 + (index % 3) * 20.0,
+                                                  width: double.infinity,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              height: 120,
+                                              color: Colors.grey[200],
+                                              child: const Icon(Icons.image, size: 40),
+                                            ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            product.title,
+                                            style: Theme.of(context).textTheme.titleMedium,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Price: \$${product.price}',
+                                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.green[700]),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
               ),
-            );
-            if (result == true) {
-              _fetchProducts();
-            }
-          },
-          child: FloatingActionButton(
-            onPressed: null,
-            child: const Icon(Icons.add),
-            tooltip: 'Add Product',
+            ],
+          ),
+        ),
+        floatingActionButton: ScaleTransition(
+          scale: _fabController,
+          child: GestureDetector(
+            onTapDown: (_) => _fabController.reverse(),
+            onTapUp: (_) => _fabController.forward(),
+            onTapCancel: () => _fabController.forward(),
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProductCreateScreen(),
+                ),
+              );
+              if (result == true) {
+                viewModel.fetchProducts();
+              }
+            },
+            child: FloatingActionButton(
+              onPressed: null,
+              child: const Icon(Icons.add),
+              tooltip: 'Add Product',
+            ),
           ),
         ),
       ),

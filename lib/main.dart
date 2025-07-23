@@ -6,6 +6,11 @@ import 'src/screens/profile_screen.dart';
 import 'src/screens/product_list_screen.dart';
 import 'src/screens/main_nav_screen.dart';
 import 'src/services/auth_service.dart';
+import 'viewmodels/auth_viewmodel.dart';
+import 'viewmodels/product_list_viewmodel.dart';
+import 'viewmodels/product_detail_viewmodel.dart';
+import 'viewmodels/product_form_viewmodel.dart';
+import 'viewmodels/profile_viewmodel.dart';
 
 void main() {
   runApp(const MyApp());
@@ -18,7 +23,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => AuthViewModel()),
+        ChangeNotifierProvider(create: (_) => ProductListViewModel()),
+        ChangeNotifierProvider(create: (_) => ProductDetailViewModel()),
+        ChangeNotifierProvider(create: (_) => ProductFormViewModel()),
+        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
       ],
       child: MaterialApp(
         title: 'Ecom App',

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import '../../viewmodels/product_form_viewmodel.dart';
+import '../models/product.dart';
 
 class ProductCreateScreen extends StatefulWidget {
   const ProductCreateScreen({Key? key}) : super(key: key);
@@ -62,64 +65,81 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
       appBar: AppBar(title: const Text('Add Product')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Title'),
-                onSaved: (v) => _title = v ?? '',
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Description'),
-                onSaved: (v) => _description = v ?? '',
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Category'),
-                onSaved: (v) => _category = v ?? '',
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Tags (comma separated)'),
-                onSaved: (v) => _tags = v ?? '',
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Price'),
-                keyboardType: TextInputType.number,
-                onSaved: (v) => _price = double.tryParse(v ?? ''),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Rating'),
-                keyboardType: TextInputType.number,
-                onSaved: (v) => _rating = double.tryParse(v ?? ''),
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Thumbnail URL'),
-                onSaved: (v) => _thumbnail = v ?? '',
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Images (comma separated URLs)'),
-                onSaved: (v) => _images = v ?? '',
-              ),
-              const SizedBox(height: 20),
-              if (_error != null) ...[
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 10),
+        child: Consumer<ProductFormViewModel>(
+          builder: (context, viewModel, _) => Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Title'),
+                  onSaved: (v) => _title = v ?? '',
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Description'),
+                  onSaved: (v) => _description = v ?? '',
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  onSaved: (v) => _category = v ?? '',
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Tags (comma separated)'),
+                  onSaved: (v) => _tags = v ?? '',
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Price'),
+                  keyboardType: TextInputType.number,
+                  onSaved: (v) => _price = double.tryParse(v ?? ''),
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Rating'),
+                  keyboardType: TextInputType.number,
+                  onSaved: (v) => _rating = double.tryParse(v ?? ''),
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Thumbnail URL'),
+                  onSaved: (v) => _thumbnail = v ?? '',
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Images (comma separated URLs)'),
+                  onSaved: (v) => _images = v ?? '',
+                ),
+                const SizedBox(height: 20),
+                if (viewModel.error != null) ...[
+                  Text(viewModel.error!, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 10),
+                ],
+                if (viewModel.success != null) ...[
+                  Text(viewModel.success!, style: const TextStyle(color: Colors.green)),
+                  const SizedBox(height: 10),
+                ],
+                viewModel.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: () async {
+                          if (!_formKey.currentState!.validate()) return;
+                          _formKey.currentState!.save();
+                          final product = Product(
+                            id: 0, // id will be set by backend
+                            title: _title,
+                            description: _description,
+                            price: _price ?? 0,
+                            rating: _rating ?? 0,
+                            category: _category,
+                            thumbnail: _thumbnail,
+                            images: _images.split(',').map((e) => e.trim()).toList(),
+                            tags: _tags.split(',').map((e) => e.trim()).toList(),
+                          );
+                          await viewModel.createProduct(product);
+                        },
+                        child: const Text('Create Product'),
+                      ),
               ],
-              if (_success != null) ...[
-                Text(_success!, style: const TextStyle(color: Colors.green)),
-                const SizedBox(height: 10),
-              ],
-              _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _submit,
-                      child: const Text('Create Product'),
-                    ),
-            ],
+            ),
           ),
         ),
       ),
